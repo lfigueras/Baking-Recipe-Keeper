@@ -70,9 +70,6 @@ fun HomeScreen(
     onTileClick: (DashboardTarget) -> Unit,
     onSeeAllClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    userName: String? = null,
-    userPhotoUrl: String? = null,
-    onAccountClick: () -> Unit = {},
     addedMessage: String? = null,
     onAddedMessageShown: () -> Unit = {},
     deletedMessage: String? = null,
@@ -102,13 +99,6 @@ fun HomeScreen(
                 colors = brandedTopAppBarColors(),
                 title = {
                     Text("Baking Recipe Keeper")
-                },
-                actions = {
-                    ProfileAvatar(
-                        name = userName,
-                        photoUrl = userPhotoUrl,
-                        onClick = onAccountClick
-                    )
                 }
             )
         },
@@ -135,7 +125,7 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                GreetingHeader(name = userName)
+                GreetingHeader(name = null)
             }
 
             item {
@@ -404,39 +394,5 @@ private fun GreetingHeader(name: String?) {
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
-}
-
-// Circular profile avatar: photo when available, otherwise the baker's initial.
-@Composable
-private fun ProfileAvatar(
-    name: String?,
-    photoUrl: String?,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .padding(end = 4.dp)
-            .size(34.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        if (photoUrl != null) {
-            AsyncImage(
-                model = photoUrl,
-                contentDescription = "Account",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            val initial = name?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
-            Text(
-                text = initial,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-        }
-    }
 }
 

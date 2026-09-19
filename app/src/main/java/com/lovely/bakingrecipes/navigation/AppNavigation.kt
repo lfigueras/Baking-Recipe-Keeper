@@ -30,12 +30,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.lovely.bakingrecipes.data.PastryDatabase
-import com.lovely.bakingrecipes.auth.AuthRepository
 import com.lovely.bakingrecipes.repository.PastryRepository
 import com.lovely.bakingrecipes.repository.ShoppingListRepository
 import com.lovely.bakingrecipes.ui.screens.add.AddPastryScreen
-import com.lovely.bakingrecipes.ui.screens.account.AccountScreen
-import com.lovely.bakingrecipes.ui.screens.account.EditProfileScreen
 import com.lovely.bakingrecipes.ui.screens.baking.StartBakingScreen
 import com.lovely.bakingrecipes.ui.screens.detail.PastryDetailScreen
 import com.lovely.bakingrecipes.ui.screens.home.HomeScreen
@@ -50,7 +47,6 @@ import com.lovely.bakingrecipes.ui.theme.ThemeMode
 import com.lovely.bakingrecipes.util.Analytics
 import com.lovely.bakingrecipes.viewmodel.AddPastryViewModel
 import com.lovely.bakingrecipes.viewmodel.AddPastryViewModelFactory
-import com.lovely.bakingrecipes.viewmodel.AuthViewModel
 import com.lovely.bakingrecipes.viewmodel.BackupViewModel
 import com.lovely.bakingrecipes.viewmodel.DashboardTarget
 import com.lovely.bakingrecipes.viewmodel.GenericViewModelFactory
@@ -103,7 +99,6 @@ fun AppNavigation(
     val shoppingRepository = ShoppingListRepository(
         shoppingListDao = database.shoppingListDao()
     )
-    val authRepository = AuthRepository()
     val scope = rememberCoroutineScope()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -157,10 +152,6 @@ fun AppNavigation(
             val homeViewModel: HomeViewModel = viewModel(
                 factory = HomeViewModelFactory(repository)
             )
-            val authViewModel: AuthViewModel = viewModel(
-                factory = GenericViewModelFactory { AuthViewModel(authRepository) }
-            )
-            val currentUser by authViewModel.user.collectAsState()
             val uiState by homeViewModel.uiState.collectAsState()
             val addedMessage by backStackEntry.savedStateHandle
                 .getStateFlow<String?>("added_pastry_message", null)
@@ -187,9 +178,6 @@ fun AppNavigation(
                 onSettingsClick = {
                     navController.navigate("settings")
                 },
-                userName = currentUser?.displayName ?: currentUser?.email,
-                userPhotoUrl = currentUser?.photoUrl?.toString(),
-                onAccountClick = { navController.navigate("account") },
                 addedMessage = addedMessage,
                 onAddedMessageShown = {
                     backStackEntry.savedStateHandle["added_pastry_message"] = null
@@ -232,56 +220,9 @@ fun AppNavigation(
         }
 
         composable("more") {
-            val authViewModel: AuthViewModel = viewModel(
-                factory = GenericViewModelFactory { AuthViewModel(authRepository) }
-            )
-            val currentUser by authViewModel.user.collectAsState()
             MoreScreen(
-                accountLabel = currentUser?.email ?: "Sign in to sync across devices",
-                onAccountClick = { navController.navigate("account") },
                 onShoppingListClick = { navController.navigate("shopping_list") },
                 onSettingsClick = { navController.navigate("settings") }
-            )
-        }
-
-        composable("account") {
-            val authViewModel: AuthViewModel = viewModel(
-                factory = GenericViewModelFactory { AuthViewModel(authRepository) }
-            )
-            val currentUser by authViewModel.user.collectAsState()
-            val isBusy by authViewModel.isBusy.collectAsState()
-            val message by authViewModel.message.collectAsState()
-            AccountScreen(
-                user = currentUser,
-                isBusy = isBusy,
-                message = message,
-                onMessageShown = authViewModel::clearMessage,
-                onSignInEmail = authViewModel::signInWithEmail,
-                onRegisterEmail = authViewModel::registerWithEmail,
-                onGoogleIdToken = authViewModel::signInWithGoogle,
-                onForgotPassword = authViewModel::sendPasswordReset,
-                onSignOut = authViewModel::signOut,
-                onEditProfile = { navController.navigate("edit_profile") },
-                onBackClick = { navController.popBackStack() }
-            )
-        }
-
-        composable("edit_profile") {
-            val authViewModel: AuthViewModel = viewModel(
-                factory = GenericViewModelFactory { AuthViewModel(authRepository) }
-            )
-            val currentUser by authViewModel.user.collectAsState()
-            val isBusy by authViewModel.isBusy.collectAsState()
-            val message by authViewModel.message.collectAsState()
-            EditProfileScreen(
-                user = currentUser,
-                isBusy = isBusy,
-                message = message,
-                onMessageShown = authViewModel::clearMessage,
-                onPickPhoto = authViewModel::updateProfilePhoto,
-                onSaveName = authViewModel::updateDisplayName,
-                onSaveEmail = authViewModel::updateEmail,
-                onBackClick = { navController.popBackStack() }
             )
         }
 

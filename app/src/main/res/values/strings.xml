@@ -1,8 +1,3 @@
 <resources>
     <string name="app_name">Baking Recipe Keeper</string>
-
-    <!-- Fill these from your Facebook app (developers.facebook.com). Leave app_id blank to hide Facebook login. -->
-    <string name="facebook_app_id">1782448822775274</string>
-    <string name="facebook_client_token">2c0b9b8f0bc0b470b3cb8aeb48786a6d</string>
-    <string name="fb_login_protocol_scheme">fb1782448822775274</string>
 </resources>

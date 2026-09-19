@@ -29,8 +29,6 @@ import com.lovely.bakingrecipes.ui.components.brandedTopAppBarColors
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoreScreen(
-    accountLabel: String,
-    onAccountClick: () -> Unit,
     onShoppingListClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
@@ -49,12 +47,6 @@ fun MoreScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            MoreRow(
-                icon = Icons.Filled.AccountCircle,
-                title = "Account",
-                subtitle = accountLabel,
-                onClick = onAccountClick
-            )
             MoreRow(
                 icon = Icons.Filled.ShoppingCart,
                 title = "Shopping List",

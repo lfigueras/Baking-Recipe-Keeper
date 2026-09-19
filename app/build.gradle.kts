@@ -90,12 +90,6 @@ dependencies {
     implementation(libs.coil.video)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
-    implementation(libs.firebase.auth)
-    implementation(libs.firebase.firestore)
-    implementation(libs.firebase.storage)
-    implementation(libs.play.services.auth)
-    implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
-    implementation(libs.facebook.login)
 }

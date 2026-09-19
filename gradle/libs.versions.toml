@@ -13,10 +13,7 @@ room = "2.8.4"
 coil = "2.7.0"
 googleservices = "4.5.0"
 firebaseBom = "34.1.0"
-playServicesAuth = "21.3.0"
-kotlinxCoroutines = "1.9.0"
 media3 = "1.4.1"
-facebookLogin = "17.0.0"
 
 # compose versions
 activityCompose = "1.10.1"
@@ -49,14 +46,8 @@ coil-video = { group = "io.coil-kt", name = "coil-video", version.ref = "coil" }
 #firebase libraries
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
-firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
-firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
-firebase-storage = { group = "com.google.firebase", name = "firebase-storage" }
-play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "playServicesAuth" }
-kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "kotlinxCoroutines" }
 androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
 androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
-facebook-login = { group = "com.facebook.android", name = "facebook-login", version.ref = "facebookLogin" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
