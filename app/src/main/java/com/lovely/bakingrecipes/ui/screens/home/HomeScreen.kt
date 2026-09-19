@@ -1,6 +1,7 @@
 package com.lovely.bakingrecipes.ui.screens.home
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.BakeryDining
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
@@ -68,6 +70,9 @@ fun HomeScreen(
     onTileClick: (DashboardTarget) -> Unit,
     onSeeAllClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    userName: String? = null,
+    userPhotoUrl: String? = null,
+    onAccountClick: () -> Unit = {},
     addedMessage: String? = null,
     onAddedMessageShown: () -> Unit = {},
     deletedMessage: String? = null,
@@ -99,12 +104,11 @@ fun HomeScreen(
                     Text("Baking Recipe Keeper")
                 },
                 actions = {
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = "Settings"
-                        )
-                    }
+                    ProfileAvatar(
+                        name = userName,
+                        photoUrl = userPhotoUrl,
+                        onClick = onAccountClick
+                    )
                 }
             )
         },
@@ -130,6 +134,10 @@ fun HomeScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            item {
+                GreetingHeader(name = userName)
+            }
+
             item {
                 DashboardTiles(
                     tiles = uiState.tiles,
@@ -305,6 +313,7 @@ private fun PastryCard(
             pressedElevation = 6.dp
         )
     ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -365,6 +374,68 @@ private fun PastryCard(
                     )
                 }
             }
+        }
+
+            if (pastry.isFavorite) {
+                Icon(
+                    imageVector = Icons.Filled.Favorite,
+                    contentDescription = "Favorite",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
+                        .size(16.dp)
+                )
+            }
+        }
+    }
+}
+
+// A friendly greeting that names the signed-in baker.
+@Composable
+private fun GreetingHeader(name: String?) {
+    val firstName = name?.trim()?.split(" ")?.firstOrNull()?.takeIf { it.isNotBlank() }
+    Text(
+        text = if (firstName != null) "Hello, $firstName 👋" else "Hello, Baker 👋",
+        style = MaterialTheme.typography.headlineSmall
+    )
+    Text(
+        text = "What are we baking today?",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+// Circular profile avatar: photo when available, otherwise the baker's initial.
+@Composable
+private fun ProfileAvatar(
+    name: String?,
+    photoUrl: String?,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .padding(end = 4.dp)
+            .size(34.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        if (photoUrl != null) {
+            AsyncImage(
+                model = photoUrl,
+                contentDescription = "Account",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            val initial = name?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+            Text(
+                text = initial,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         }
     }
 }

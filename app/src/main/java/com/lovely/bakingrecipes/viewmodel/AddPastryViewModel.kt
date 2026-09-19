@@ -11,10 +11,13 @@ import androidx.lifecycle.viewModelScope
 import com.lovely.bakingrecipes.data.Ingredient
 import com.lovely.bakingrecipes.data.IngredientUnit
 import com.lovely.bakingrecipes.data.ImageStorage
+import com.lovely.bakingrecipes.data.MediaItem
+import com.lovely.bakingrecipes.data.MediaType
 import com.lovely.bakingrecipes.data.Pastry
 import com.lovely.bakingrecipes.data.Step
 import com.lovely.bakingrecipes.data.formatAmount
 import com.lovely.bakingrecipes.repository.PastryRepository
+import com.lovely.bakingrecipes.util.Analytics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -34,6 +37,14 @@ data class IngredientDraft(
 data class StepDraft(
     val key: Long,
     val text: String = ""
+)
+
+// One photo or video attached to the recipe; existing items already live in app storage.
+data class MediaDraft(
+    val key: Long,
+    val uri: Uri,
+    val type: MediaType,
+    val isExisting: Boolean
 )
 
 class AddPastryViewModel(
@@ -81,11 +92,23 @@ class AddPastryViewModel(
     private var nextStepKey = 0L
     val steps = mutableStateListOf<StepDraft>()
 
+    val tags = mutableStateListOf<String>()
+
+    // Increments only on user-initiated row adds, so the form scrolls to reveal a new row.
+    var addRowTick by mutableStateOf(0)
+        private set
+
+    private var nextMediaKey = 0L
+    val mediaItems = mutableStateListOf<MediaDraft>()
+
     // The already-stored image path, so we don't re-copy an unchanged photo when editing.
     private var existingImageUri: String? = null
 
     // Preserved so an edit keeps the original creation time.
     private var existingCreatedAt: Long = System.currentTimeMillis()
+
+    // Preserved so an edit keeps the favorite flag.
+    private var existingIsFavorite: Boolean = false
 
     // Snapshot of the initial form, used to detect unsaved changes.
     private var initialName = ""
@@ -98,6 +121,8 @@ class AddPastryViewModel(
     private var initialImage: String? = null
     private var initialIngredients: List<Triple<String, String, IngredientUnit>> = emptyList()
     private var initialSteps: List<String> = emptyList()
+    private var initialTags: List<String> = emptyList()
+    private var initialMedia: List<String> = emptyList()
 
     init {
         if (pastryId != null) {
@@ -113,6 +138,7 @@ class AddPastryViewModel(
             description = data.pastry.description
             existingImageUri = data.pastry.imageUri
             existingCreatedAt = data.pastry.createdAt
+            existingIsFavorite = data.pastry.isFavorite
             selectedImageUri = data.pastry.imageUri?.let { Uri.parse(it) }
             ingredients.clear()
             data.ingredients.forEach { ingredient ->
@@ -128,6 +154,21 @@ class AddPastryViewModel(
             steps.clear()
             data.steps.sortedBy { it.position }.forEach { step ->
                 steps.add(StepDraft(key = nextStepKey++, text = step.instruction))
+            }
+
+            tags.clear()
+            data.tags.forEach { tags.add(it.name) }
+
+            mediaItems.clear()
+            data.media.sortedBy { it.position }.forEach { m ->
+                mediaItems.add(
+                    MediaDraft(
+                        key = nextMediaKey++,
+                        uri = Uri.parse(m.uri),
+                        type = m.type,
+                        isExisting = true
+                    )
+                )
             }
 
             servings = data.pastry.servings.takeIf { it > 0 }?.toString() ?: ""
@@ -152,6 +193,8 @@ class AddPastryViewModel(
             .filter { it.name.isNotBlank() || it.amount.isNotBlank() }
             .map { Triple(it.name, it.amount, it.unit) }
         initialSteps = steps.map { it.text }.filter { it.isNotBlank() }
+        initialTags = tags.toList()
+        initialMedia = mediaItems.map { it.uri.toString() }
     }
 
     fun hasUnsavedChanges(): Boolean {
@@ -169,7 +212,38 @@ class AddPastryViewModel(
         if (currentIngredients != initialIngredients) return true
         val currentSteps = steps.map { it.text }.filter { it.isNotBlank() }
         if (currentSteps != initialSteps) return true
+        if (tags.toList() != initialTags) return true
+        if (mediaItems.map { it.uri.toString() } != initialMedia) return true
         return false
+    }
+
+    fun addPhotos(uris: List<Uri>) {
+        uris.forEach { uri ->
+            mediaItems.add(
+                MediaDraft(key = nextMediaKey++, uri = uri, type = MediaType.PHOTO, isExisting = false)
+            )
+        }
+    }
+
+    fun addVideo(uri: Uri) {
+        mediaItems.add(
+            MediaDraft(key = nextMediaKey++, uri = uri, type = MediaType.VIDEO, isExisting = false)
+        )
+    }
+
+    fun removeMedia(key: Long) {
+        mediaItems.removeAll { it.key == key }
+    }
+
+    fun addTag(raw: String) {
+        val name = raw.trim()
+        if (name.isNotEmpty() && tags.none { it.equals(name, ignoreCase = true) }) {
+            tags.add(name)
+        }
+    }
+
+    fun removeTag(name: String) {
+        tags.removeAll { it.equals(name, ignoreCase = true) }
     }
 
     fun onPastryNameChange(newName: String) {
@@ -209,6 +283,7 @@ class AddPastryViewModel(
 
     fun addIngredientRow() {
         ingredients.add(IngredientDraft(key = nextIngredientKey++))
+        addRowTick++
     }
 
     fun removeIngredientRow(key: Long) {
@@ -244,6 +319,7 @@ class AddPastryViewModel(
 
     fun addStepRow() {
         steps.add(StepDraft(key = nextStepKey++))
+        addRowTick++
     }
 
     fun removeStepRow(key: Long) {
@@ -308,6 +384,7 @@ class AddPastryViewModel(
 
         viewModelScope.launch {
             val imageUriString = resolveImageUri()
+            val resolvedMedia = resolveMedia()
 
             if (pastryId == null) {
                 val pastry = Pastry(
@@ -320,7 +397,10 @@ class AddPastryViewModel(
                     cookMinutes = cookMinutes.toIntOrNull() ?: 0,
                     difficulty = difficulty
                 )
-                repository.insertPastryWithIngredients(pastry, validIngredients, validSteps)
+                repository.insertPastryWithIngredients(
+                    pastry, validIngredients, validSteps, tags.toList(), resolvedMedia
+                )
+                Analytics.recipeCreated(pastry.category, validIngredients.size, validSteps.size)
             } else {
                 val pastry = Pastry(
                     id = pastryId,
@@ -332,20 +412,59 @@ class AddPastryViewModel(
                     prepMinutes = prepMinutes.toIntOrNull() ?: 0,
                     cookMinutes = cookMinutes.toIntOrNull() ?: 0,
                     difficulty = difficulty,
+                    isFavorite = existingIsFavorite,
                     createdAt = existingCreatedAt,
                     updatedAt = System.currentTimeMillis()
                 )
-                repository.updatePastryWithIngredients(pastry, validIngredients, validSteps)
+                repository.updatePastryWithIngredients(
+                    pastry, validIngredients, validSteps, tags.toList(), resolvedMedia
+                )
+                Analytics.recipeEdited()
 
                 // Remove the previous photo if it was swapped out or cleared.
                 if (existingImageUri != null && existingImageUri != imageUriString) {
                     ImageStorage.deleteIfLocal(getApplication(), existingImageUri)
+                }
+
+                // Remove media files the user dropped during this edit.
+                val keptUris = resolvedMedia.map { it.uri }.toSet()
+                initialMedia.filter { it !in keptUris }.forEach {
+                    ImageStorage.deleteIfLocal(getApplication(), it)
                 }
             }
 
             saveComplete = true
         }
     }
+
+    // Copies newly picked media into app storage; keeps existing items as-is.
+    private suspend fun resolveMedia(): List<MediaItem> =
+        mediaItems.mapNotNull { draft ->
+            val uriString = if (draft.isExisting) {
+                draft.uri.toString()
+            } else {
+                copyMediaToInternalStorage(draft.uri, draft.type)
+            }
+            uriString?.let {
+                MediaItem(pastryId = 0, uri = it, type = draft.type, position = 0)
+            }
+        }
+
+    private suspend fun copyMediaToInternalStorage(uri: Uri, type: MediaType): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                val context = getApplication<Application>()
+                val ext = if (type == MediaType.VIDEO) "mp4" else "jpg"
+                val prefix = if (type == MediaType.VIDEO) "video" else "photo"
+                val file = File(context.filesDir, "${prefix}_${System.currentTimeMillis()}_${nextMediaKey++}.$ext")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    file.outputStream().use { output -> input.copyTo(output) }
+                }
+                Uri.fromFile(file).toString()
+            } catch (e: Exception) {
+                null
+            }
+        }
 
     // Reuse the stored file when the photo is unchanged; copy only newly picked images.
     private suspend fun resolveImageUri(): String? {

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1019957193657",
+    "project_id": "baking-recipe-keeper",
+    "storage_bucket": "baking-recipe-keeper.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1019957193657:android:0e4f75d92ac768692c2468",
+        "android_client_info": {
+          "package_name": "com.lovely.bakingrecipes"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBbXnUb01pM2sVvAILRnD6yvgbb611Td94"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

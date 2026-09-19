@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BakeryDining
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -45,7 +46,7 @@ fun PastryListScreen(
     title: String,
     pastries: List<PastryWithIngredients>,
     isLoading: Boolean,
-    onBackClick: () -> Unit,
+    onBackClick: (() -> Unit)?,
     onPastryClick: (Int) -> Unit,
     deletedMessage: String? = null,
     onDeletedMessageShown: () -> Unit = {}
@@ -66,11 +67,13 @@ fun PastryListScreen(
                 colors = brandedTopAppBarColors(),
                 title = { Text(title) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                    if (onBackClick != null) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
                     }
                 }
             )
@@ -134,6 +137,7 @@ private fun PastryRow(
             .fillMaxWidth()
             .clickable(onClick = onClick)
     ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -185,6 +189,19 @@ private fun PastryRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+        }
+
+            if (pastry.isFavorite) {
+                Icon(
+                    imageVector = Icons.Filled.Favorite,
+                    contentDescription = "Favorite",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
+                        .size(16.dp)
+                )
             }
         }
     }

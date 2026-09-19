@@ -16,6 +16,7 @@ data class Pastry(
     val prepMinutes: Int = 0,
     val cookMinutes: Int = 0,
     val difficulty: String = "",
+    val isFavorite: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

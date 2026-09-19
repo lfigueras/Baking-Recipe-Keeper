@@ -1,6 +1,7 @@
 package com.lovely.bakingrecipes.data
 
 import androidx.room.Embedded
+import androidx.room.Junction
 import androidx.room.Relation
 
 data class PastryWithIngredients(
@@ -14,5 +15,20 @@ data class PastryWithIngredients(
         parentColumn = "id",
         entityColumn = "pastryId"
     )
-    val steps: List<Step> = emptyList()
+    val steps: List<Step> = emptyList(),
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "pastryId"
+    )
+    val media: List<MediaItem> = emptyList(),
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "id",
+        associateBy = Junction(
+            value = PastryTagCrossRef::class,
+            parentColumn = "pastryId",
+            entityColumn = "tagId"
+        )
+    )
+    val tags: List<Tag> = emptyList()
 )

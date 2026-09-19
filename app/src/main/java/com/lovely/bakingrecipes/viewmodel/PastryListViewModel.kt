@@ -11,10 +11,15 @@ import kotlinx.coroutines.flow.stateIn
 
 class PastryListViewModel(
     repository: PastryRepository,
-    private val category: String?
+    private val category: String?,
+    private val favoritesOnly: Boolean = false
 ) : ViewModel() {
 
-    val title: String = category ?: "All Recipes"
+    val title: String = when {
+        favoritesOnly -> "Favorites"
+        category != null -> category
+        else -> "All Recipes"
+    }
 
     val isLoading: StateFlow<Boolean> =
         repository.allPastries.map { false }.stateIn(
@@ -28,6 +33,7 @@ class PastryListViewModel(
             .map { pastries ->
                 pastries
                     .filter { category == null || it.pastry.category == category }
+                    .filter { !favoritesOnly || it.pastry.isFavorite }
                     .sortedBy { it.pastry.name.lowercase() }
             }
             .stateIn(

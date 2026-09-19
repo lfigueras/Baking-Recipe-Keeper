@@ -42,8 +42,7 @@ class HomeViewModel(
                 .sorted()
 
             val filtered = all.filter { item ->
-                val matchesQuery = query.isBlank() ||
-                    item.pastry.name.contains(query, ignoreCase = true)
+                val matchesQuery = query.isBlank() || item.matchesSearch(query)
                 val matchesCategory = category == null || item.pastry.category == category
                 matchesQuery && matchesCategory
             }
@@ -73,4 +72,16 @@ class HomeViewModel(
     fun onCategorySelected(category: String?) {
         selectedCategory.value = if (selectedCategory.value == category) null else category
     }
+}
+
+// Matches a query against the recipe name, category, description, tags, and ingredient names.
+private fun PastryWithIngredients.matchesSearch(query: String): Boolean {
+    val q = query.trim()
+    if (q.isBlank()) return true
+    if (pastry.name.contains(q, ignoreCase = true)) return true
+    if (pastry.category.contains(q, ignoreCase = true)) return true
+    if (pastry.description.contains(q, ignoreCase = true)) return true
+    if (tags.any { it.name.contains(q, ignoreCase = true) }) return true
+    if (ingredients.any { it.name.contains(q, ignoreCase = true) }) return true
+    return false
 }

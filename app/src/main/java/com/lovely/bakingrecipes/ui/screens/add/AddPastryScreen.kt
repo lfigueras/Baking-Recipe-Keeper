@@ -7,8 +7,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,8 +31,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -38,6 +45,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
@@ -63,8 +71,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.input.KeyboardType
@@ -75,11 +86,16 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.decode.VideoFrameDecoder
+import coil.request.ImageRequest
+import coil.request.videoFrameMillis
 import com.lovely.bakingrecipes.data.IngredientUnit
+import com.lovely.bakingrecipes.data.MediaType
 import com.lovely.bakingrecipes.data.PastryCategories
 import com.lovely.bakingrecipes.ui.components.brandedTopAppBarColors
 import com.lovely.bakingrecipes.viewmodel.AddPastryViewModel
 import com.lovely.bakingrecipes.viewmodel.IngredientDraft
+import com.lovely.bakingrecipes.viewmodel.MediaDraft
 import com.lovely.bakingrecipes.viewmodel.StepDraft
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -103,22 +119,12 @@ fun AddPastryScreen(
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    var previousIngredientCount by remember { mutableIntStateOf(viewModel.ingredients.size) }
-    var previousStepCount by remember { mutableIntStateOf(viewModel.steps.size) }
 
-    // When a row is added, reveal it by scrolling to the bottom of the form.
-    LaunchedEffect(viewModel.ingredients.size) {
-        if (viewModel.ingredients.size > previousIngredientCount) {
+    // Reveal a newly added row by scrolling to the bottom — only on user adds, not on data load.
+    LaunchedEffect(viewModel.addRowTick) {
+        if (viewModel.addRowTick > 0) {
             scrollState.animateScrollTo(scrollState.maxValue)
         }
-        previousIngredientCount = viewModel.ingredients.size
-    }
-
-    LaunchedEffect(viewModel.steps.size) {
-        if (viewModel.steps.size > previousStepCount) {
-            scrollState.animateScrollTo(scrollState.maxValue)
-        }
-        previousStepCount = viewModel.steps.size
     }
 
     var showDiscardDialog by remember { mutableStateOf(false) }
@@ -133,6 +139,16 @@ fun AddPastryScreen(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         viewModel.onImageSelected(uri)
+    }
+    val multiPhotoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(10)
+    ) { uris ->
+        if (uris.isNotEmpty()) viewModel.addPhotos(uris)
+    }
+    val videoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        uri?.let { viewModel.addVideo(it) }
     }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -191,6 +207,12 @@ fun AddPastryScreen(
                 onSelected = { viewModel.onCategoryChange(it) }
             )
 
+            TagsInput(
+                tags = viewModel.tags,
+                onAddTag = { viewModel.addTag(it) },
+                onRemoveTag = { viewModel.removeTag(it) }
+            )
+
             Text(
                 text = "Short Description"
             )
@@ -244,35 +266,6 @@ fun AddPastryScreen(
                 selected = viewModel.difficulty,
                 onSelected = { viewModel.onDifficultyChange(it) }
             )
-
-            Text(
-                text = "Recipe Photo"
-            )
-
-            OutlinedButton(
-                onClick = {
-                    photoPickerLauncher.launch(
-                        PickVisualMediaRequest(
-                            ActivityResultContracts.PickVisualMedia.ImageOnly
-                        )
-                    )
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Choose Photo")
-            }
-
-            viewModel.selectedImageUri?.let { uri ->
-                AsyncImage(
-                    model = uri,
-                    contentDescription = "Selected recipe photo",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                )
-            }
 
             Text(
                 text = if (viewModel.ingredients.isEmpty()) {
@@ -342,6 +335,80 @@ fun AddPastryScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Reorder procedure")
+                }
+            }
+
+            Text(
+                text = "Recipe Photo"
+            )
+
+            OutlinedButton(
+                onClick = {
+                    photoPickerLauncher.launch(
+                        PickVisualMediaRequest(
+                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                        )
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Choose Photo")
+            }
+
+            viewModel.selectedImageUri?.let { uri ->
+                AsyncImage(
+                    model = uri,
+                    contentDescription = "Selected recipe photo",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                )
+            }
+
+            Text(
+                text = if (viewModel.mediaItems.isEmpty()) {
+                    "More Photos & Video"
+                } else {
+                    "More Photos & Video (${viewModel.mediaItems.size})"
+                }
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        multiPhotoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Add Photos")
+                }
+                OutlinedButton(
+                    onClick = {
+                        videoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+                        )
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Add Video")
+                }
+            }
+
+            if (viewModel.mediaItems.isNotEmpty()) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    itemsIndexed(
+                        viewModel.mediaItems,
+                        key = { _, m -> m.key }
+                    ) { _, media ->
+                        MediaThumbnail(
+                            media = media,
+                            onRemove = { viewModel.removeMedia(media.key) }
+                        )
+                    }
                 }
             }
 
@@ -780,6 +847,125 @@ private fun IngredientRow(
                     color = MaterialTheme.colorScheme.error
                 )
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TagsInput(
+    tags: List<String>,
+    onAddTag: (String) -> Unit,
+    onRemoveTag: (String) -> Unit
+) {
+    var draft by remember { mutableStateOf("") }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = if (tags.isEmpty()) "Tags" else "Tags (${tags.size})",
+            style = MaterialTheme.typography.titleMedium
+        )
+        OutlinedTextField(
+            value = draft,
+            onValueChange = { draft = it },
+            label = { Text("Add a tag") },
+            placeholder = { Text("e.g. Chocolate, Vegan") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            trailingIcon = {
+                IconButton(
+                    onClick = {
+                        onAddTag(draft)
+                        draft = ""
+                    },
+                    enabled = draft.isNotBlank()
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add tag")
+                }
+            }
+        )
+        if (tags.isNotEmpty()) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                tags.forEach { tag ->
+                    InputChip(
+                        selected = false,
+                        onClick = { onRemoveTag(tag) },
+                        label = { Text(tag) },
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Remove $tag"
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MediaThumbnail(
+    media: MediaDraft,
+    onRemove: () -> Unit
+) {
+    val context = LocalContext.current
+    Box(
+        modifier = Modifier
+            .size(88.dp)
+            .clip(RoundedCornerShape(10.dp))
+    ) {
+        if (media.type == MediaType.VIDEO) {
+            // Decode a frame so the video shows a preview instead of a black box.
+            val request = ImageRequest.Builder(context)
+                .data(media.uri)
+                .decoderFactory(VideoFrameDecoder.Factory())
+                .videoFrameMillis(1000)
+                .crossfade(true)
+                .build()
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = request,
+                    contentDescription = "Video",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = "Video",
+                    tint = Color.White
+                )
+            }
+        } else {
+            AsyncImage(
+                model = media.uri,
+                contentDescription = "Recipe photo",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+                .size(22.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.55f))
+                .clickable(onClick = onRemove),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Close,
+                contentDescription = "Remove",
+                tint = Color.White,
+                modifier = Modifier.size(14.dp)
+            )
         }
     }
 }

@@ -2,28 +2,56 @@ package com.lovely.bakingrecipes.navigation
 
 import android.app.Application
 import android.net.Uri
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.lovely.bakingrecipes.data.PastryDatabase
+import com.lovely.bakingrecipes.auth.AuthRepository
 import com.lovely.bakingrecipes.repository.PastryRepository
+import com.lovely.bakingrecipes.repository.ShoppingListRepository
 import com.lovely.bakingrecipes.ui.screens.add.AddPastryScreen
+import com.lovely.bakingrecipes.ui.screens.account.AccountScreen
+import com.lovely.bakingrecipes.ui.screens.account.EditProfileScreen
+import com.lovely.bakingrecipes.ui.screens.baking.StartBakingScreen
 import com.lovely.bakingrecipes.ui.screens.detail.PastryDetailScreen
 import com.lovely.bakingrecipes.ui.screens.home.HomeScreen
 import com.lovely.bakingrecipes.ui.screens.ingredients.IngredientsListScreen
+import com.lovely.bakingrecipes.ui.screens.media.MediaAlbumScreen
+import com.lovely.bakingrecipes.ui.screens.more.MoreScreen
 import com.lovely.bakingrecipes.ui.screens.overview.OverviewScreen
 import com.lovely.bakingrecipes.ui.screens.pastrylist.PastryListScreen
 import com.lovely.bakingrecipes.ui.screens.settings.SettingsScreen
+import com.lovely.bakingrecipes.ui.screens.shopping.ShoppingListScreen
 import com.lovely.bakingrecipes.ui.theme.ThemeMode
+import com.lovely.bakingrecipes.util.Analytics
 import com.lovely.bakingrecipes.viewmodel.AddPastryViewModel
 import com.lovely.bakingrecipes.viewmodel.AddPastryViewModelFactory
+import com.lovely.bakingrecipes.viewmodel.AuthViewModel
+import com.lovely.bakingrecipes.viewmodel.BackupViewModel
 import com.lovely.bakingrecipes.viewmodel.DashboardTarget
 import com.lovely.bakingrecipes.viewmodel.GenericViewModelFactory
 import com.lovely.bakingrecipes.viewmodel.HomeViewModel
@@ -33,6 +61,8 @@ import com.lovely.bakingrecipes.viewmodel.OverviewViewModel
 import com.lovely.bakingrecipes.viewmodel.PastryDetailViewModel
 import com.lovely.bakingrecipes.viewmodel.PastryDetailViewModelFactory
 import com.lovely.bakingrecipes.viewmodel.PastryListViewModel
+import com.lovely.bakingrecipes.viewmodel.ShoppingListViewModel
+import kotlinx.coroutines.launch
 
 // Maps a tapped dashboard tile to its destination route.
 private fun targetRoute(target: DashboardTarget): String = when (target) {
@@ -40,6 +70,19 @@ private fun targetRoute(target: DashboardTarget): String = when (target) {
     DashboardTarget.AllPastries -> "pastry_list/__all__"
     is DashboardTarget.Category -> "pastry_list/${Uri.encode(target.name)}"
 }
+
+private data class BottomTab(
+    val route: String,
+    val label: String,
+    val icon: ImageVector
+)
+
+private val bottomTabs = listOf(
+    BottomTab("home", "Home", Icons.Filled.Home),
+    BottomTab("favorites", "Favorites", Icons.Filled.Favorite),
+    BottomTab("categories", "Categories", Icons.Filled.GridView),
+    BottomTab("more", "More", Icons.Filled.MoreHoriz)
+)
 
 @Composable
 fun AppNavigation(
@@ -57,16 +100,67 @@ fun AppNavigation(
     val repository = PastryRepository(
         pastryDao = database.pastryDao()
     )
+    val shoppingRepository = ShoppingListRepository(
+        shoppingListDao = database.shoppingListDao()
+    )
+    val authRepository = AuthRepository()
+    val scope = rememberCoroutineScope()
 
-    NavHost(
-        navController = navController,
-        startDestination = "home"
-    ) {
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    // Report each visited destination as a screen_view.
+    LaunchedEffect(currentRoute) {
+        currentRoute?.let { Analytics.screenView(it) }
+    }
+    // Hide the bar only on immersive/form flows; show it everywhere else for quick tab access.
+    val hiddenBottomBarRoutes = setOf(
+        "add_pastry",
+        "edit_pastry/{pastryId}",
+        "start_baking/{pastryId}"
+    )
+    val showBottomBar = currentRoute != null && currentRoute !in hiddenBottomBarRoutes
+
+    Scaffold(
+        bottomBar = {
+            if (showBottomBar) {
+                NavigationBar {
+                    bottomTabs.forEach { tab ->
+                        val selected = currentRoute == tab.route
+                        NavigationBarItem(
+                            selected = selected,
+                            onClick = {
+                                // Pop to the tab root without restoring shared sub-pages (e.g. Settings).
+                                navController.navigate(tab.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        inclusive = false
+                                    }
+                                    launchSingleTop = true
+                                }
+                            },
+                            icon = { Icon(tab.icon, contentDescription = tab.label) },
+                            label = { Text(tab.label) }
+                        )
+                    }
+                }
+            }
+        }
+    ) { scaffoldPadding ->
+
+        // Only consume the bottom inset (nav bar); each screen's TopAppBar handles the top inset.
+        NavHost(
+            navController = navController,
+            startDestination = "home",
+            modifier = Modifier.padding(bottom = scaffoldPadding.calculateBottomPadding())
+        ) {
 
         composable("home") { backStackEntry ->
             val homeViewModel: HomeViewModel = viewModel(
                 factory = HomeViewModelFactory(repository)
             )
+            val authViewModel: AuthViewModel = viewModel(
+                factory = GenericViewModelFactory { AuthViewModel(authRepository) }
+            )
+            val currentUser by authViewModel.user.collectAsState()
             val uiState by homeViewModel.uiState.collectAsState()
             val addedMessage by backStackEntry.savedStateHandle
                 .getStateFlow<String?>("added_pastry_message", null)
@@ -93,6 +187,9 @@ fun AppNavigation(
                 onSettingsClick = {
                     navController.navigate("settings")
                 },
+                userName = currentUser?.displayName ?: currentUser?.email,
+                userPhotoUrl = currentUser?.photoUrl?.toString(),
+                onAccountClick = { navController.navigate("account") },
                 addedMessage = addedMessage,
                 onAddedMessageShown = {
                     backStackEntry.savedStateHandle["added_pastry_message"] = null
@@ -101,6 +198,107 @@ fun AppNavigation(
                 onDeletedMessageShown = {
                     backStackEntry.savedStateHandle["deleted_recipe_name"] = null
                 }
+            )
+        }
+
+        composable("favorites") {
+            val listViewModel: PastryListViewModel = viewModel(
+                factory = GenericViewModelFactory {
+                    PastryListViewModel(repository, category = null, favoritesOnly = true)
+                }
+            )
+            val pastries by listViewModel.pastries.collectAsState()
+            val listLoading by listViewModel.isLoading.collectAsState()
+            PastryListScreen(
+                title = listViewModel.title,
+                pastries = pastries,
+                isLoading = listLoading,
+                onBackClick = null,
+                onPastryClick = { id -> navController.navigate("detail/$id") }
+            )
+        }
+
+        composable("categories") {
+            val overviewViewModel: OverviewViewModel = viewModel(
+                factory = GenericViewModelFactory { OverviewViewModel(repository) }
+            )
+            val tiles by overviewViewModel.tiles.collectAsState()
+            OverviewScreen(
+                tiles = tiles,
+                onBackClick = null,
+                title = "Categories",
+                onTileClick = { target -> navController.navigate(targetRoute(target)) }
+            )
+        }
+
+        composable("more") {
+            val authViewModel: AuthViewModel = viewModel(
+                factory = GenericViewModelFactory { AuthViewModel(authRepository) }
+            )
+            val currentUser by authViewModel.user.collectAsState()
+            MoreScreen(
+                accountLabel = currentUser?.email ?: "Sign in to sync across devices",
+                onAccountClick = { navController.navigate("account") },
+                onShoppingListClick = { navController.navigate("shopping_list") },
+                onSettingsClick = { navController.navigate("settings") }
+            )
+        }
+
+        composable("account") {
+            val authViewModel: AuthViewModel = viewModel(
+                factory = GenericViewModelFactory { AuthViewModel(authRepository) }
+            )
+            val currentUser by authViewModel.user.collectAsState()
+            val isBusy by authViewModel.isBusy.collectAsState()
+            val message by authViewModel.message.collectAsState()
+            AccountScreen(
+                user = currentUser,
+                isBusy = isBusy,
+                message = message,
+                onMessageShown = authViewModel::clearMessage,
+                onSignInEmail = authViewModel::signInWithEmail,
+                onRegisterEmail = authViewModel::registerWithEmail,
+                onGoogleIdToken = authViewModel::signInWithGoogle,
+                onForgotPassword = authViewModel::sendPasswordReset,
+                onSignOut = authViewModel::signOut,
+                onEditProfile = { navController.navigate("edit_profile") },
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable("edit_profile") {
+            val authViewModel: AuthViewModel = viewModel(
+                factory = GenericViewModelFactory { AuthViewModel(authRepository) }
+            )
+            val currentUser by authViewModel.user.collectAsState()
+            val isBusy by authViewModel.isBusy.collectAsState()
+            val message by authViewModel.message.collectAsState()
+            EditProfileScreen(
+                user = currentUser,
+                isBusy = isBusy,
+                message = message,
+                onMessageShown = authViewModel::clearMessage,
+                onPickPhoto = authViewModel::updateProfilePhoto,
+                onSaveName = authViewModel::updateDisplayName,
+                onSaveEmail = authViewModel::updateEmail,
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable("shopping_list") {
+            val shoppingViewModel: ShoppingListViewModel = viewModel(
+                factory = GenericViewModelFactory { ShoppingListViewModel(shoppingRepository, repository) }
+            )
+            val items by shoppingViewModel.items.collectAsState()
+            ShoppingListScreen(
+                items = items,
+                onBackClick = { navController.popBackStack() },
+                onToggleChecked = shoppingViewModel::setChecked,
+                onDelete = shoppingViewModel::delete,
+                onClearChecked = shoppingViewModel::clearChecked,
+                onClearAll = shoppingViewModel::clearAll,
+                onAddManual = shoppingViewModel::addManual,
+                onAddAllRecipes = shoppingViewModel::addAllRecipeIngredients
             )
         }
 
@@ -156,6 +354,12 @@ fun AppNavigation(
             val editedName by backStackEntry.savedStateHandle
                 .getStateFlow<String?>("edited_pastry_name", null)
                 .collectAsState()
+            val duplicatedMessage by backStackEntry.savedStateHandle
+                .getStateFlow<String?>("duplicated_message", null)
+                .collectAsState()
+            val addedToListMessage by backStackEntry.savedStateHandle
+                .getStateFlow<String?>("added_to_list_message", null)
+                .collectAsState()
             PastryDetailScreen(
                 pastry = pastry,
                 onBackClick = {
@@ -171,10 +375,67 @@ fun AppNavigation(
                         ?.set("deleted_recipe_name", toDelete.name)
                     navController.popBackStack()
                 },
+                onToggleFavorite = { detailViewModel.toggleFavorite() },
+                onDuplicate = {
+                    detailViewModel.duplicate { newId ->
+                        navController.navigate("detail/$newId") {
+                            popUpTo("detail/$pastryId") { inclusive = true }
+                        }
+                    }
+                },
+                onAddToShoppingList = { scale ->
+                    val current = pastry
+                    if (current != null) {
+                        scope.launch { shoppingRepository.addFromRecipe(current, scale) }
+                        Analytics.shoppingListAdd("recipe")
+                        backStackEntry.savedStateHandle["added_to_list_message"] =
+                            "Added to shopping list"
+                    }
+                },
+                onStartBaking = { id -> navController.navigate("start_baking/$id") },
+                onSeeAllMedia = { id -> navController.navigate("media/$id") },
                 editedMessage = editedName,
                 onEditedMessageShown = {
                     backStackEntry.savedStateHandle["edited_pastry_name"] = null
+                },
+                duplicatedMessage = duplicatedMessage,
+                onDuplicatedMessageShown = {
+                    backStackEntry.savedStateHandle["duplicated_message"] = null
+                },
+                addedToListMessage = addedToListMessage,
+                onAddedToListMessageShown = {
+                    backStackEntry.savedStateHandle["added_to_list_message"] = null
                 }
+            )
+        }
+
+        composable(
+            route = "start_baking/{pastryId}",
+            arguments = listOf(navArgument("pastryId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val pastryId = backStackEntry.arguments?.getInt("pastryId") ?: return@composable
+            val detailViewModel: PastryDetailViewModel = viewModel(
+                factory = PastryDetailViewModelFactory(application, repository, pastryId)
+            )
+            val pastry by detailViewModel.pastry.collectAsState()
+            StartBakingScreen(
+                pastry = pastry,
+                onExit = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = "media/{pastryId}",
+            arguments = listOf(navArgument("pastryId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val pastryId = backStackEntry.arguments?.getInt("pastryId") ?: return@composable
+            val detailViewModel: PastryDetailViewModel = viewModel(
+                factory = PastryDetailViewModelFactory(application, repository, pastryId)
+            )
+            val pastry by detailViewModel.pastry.collectAsState()
+            MediaAlbumScreen(
+                media = pastry?.media.orEmpty(),
+                onBackClick = { navController.popBackStack() }
             )
         }
 
@@ -195,12 +456,17 @@ fun AppNavigation(
         }
 
         composable("settings") {
+            val backupViewModel: BackupViewModel = viewModel(
+                factory = GenericViewModelFactory { BackupViewModel(application, repository) }
+            )
             SettingsScreen(
                 themeMode = themeMode,
                 onThemeModeChange = onThemeModeChange,
                 onBackClick = {
                     navController.popBackStack()
-                }
+                },
+                onExport = { uri, onResult -> backupViewModel.exportTo(uri, onResult) },
+                onImport = { uri, onResult -> backupViewModel.importFrom(uri, onResult) }
             )
         }
 
@@ -262,5 +528,6 @@ fun AppNavigation(
                 }
             )
         }
+    }
     }
 }

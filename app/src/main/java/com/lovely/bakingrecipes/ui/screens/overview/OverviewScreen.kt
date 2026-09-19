@@ -27,20 +27,23 @@ import com.lovely.bakingrecipes.viewmodel.DashboardTile
 @Composable
 fun OverviewScreen(
     tiles: List<DashboardTile>,
-    onBackClick: () -> Unit,
+    onBackClick: (() -> Unit)? = null,
+    title: String = "Overview",
     onTileClick: (DashboardTarget) -> Unit
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 colors = brandedTopAppBarColors(),
-                title = { Text("Overview") },
+                title = { Text(title) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                    if (onBackClick != null) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
                     }
                 }
             )

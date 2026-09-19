@@ -6,7 +6,8 @@
       <GradleProjectSettings>
         <option name="testRunner" value="CHOOSE_PER_TEST" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="gradleJvm" value="#GRADLE_LOCAL_JAVA_HOME" />
+        <option name="gradleJvm" value="/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home" />
+        <option name="distributionType" value="DEFAULT_WRAPPED" />
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
