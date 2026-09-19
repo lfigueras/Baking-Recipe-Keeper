@@ -23,21 +23,28 @@ Grab the latest APK from the **[Releases page](https://github.com/lfigueras/Ingr
 - **Recipes** with photo, category, description, servings, prep/bake time, and difficulty
 - **Ingredients** with amounts and units (g, kg, ml, cups, tbsp, tsp, pieces…)
 - **Baking procedure** — numbered steps with **hold-and-drag reordering**
+- **Start Baking mode** — distraction-free, step-by-step guided view
 - **Live scaling** — change servings and every ingredient amount recalculates
+- **Unit conversion** — convert ingredient amounts between compatible units on the fly
+- **Favorites & tags** — mark go-to recipes and organize with custom tags
+- **Shopping list** — add ingredients from any recipe and check them off
+- **Media gallery** — attach multiple photos and videos per recipe (video playback via ExoPlayer)
+- **Backup & restore** — export/import your data so nothing is lost
 - **Dashboard** — tappable count tiles, search, and category filters
 - **Ingredients overview** — grouped across all recipes with per-unit totals
 - **Share** a recipe as clean, formatted text
 - **Light / Dark / System** theme with a custom caramel-and-cream palette
-- Full-screen photo viewer, settings, and friendly confirmations
+- **Offline-first** — all data is stored locally on the device; no account or internet required
 
 ---
 
 ## 🛠️ Tech stack
 
 - **Kotlin**, **Jetpack Compose**, **Material 3**
-- **MVVM** architecture
-- **Room** (SQLite) with proper schema **migrations**
-- **Navigation Compose**, **Coil** image loading
+- **MVVM** architecture with **StateFlow**
+- **Room** (SQLite) with proper schema **migrations** (v1 → v7)
+- **Navigation Compose**, **Coil** image & video-thumbnail loading
+- **Media3 / ExoPlayer** for in-app video playback
 - **Kotlin Coroutines / Flow**
 - **JUnit** unit tests for core logic
 
@@ -91,8 +98,11 @@ Found a bug or have an idea? I'd love to hear it!
 
 ## 🗺️ Roadmap
 
-Favorites, shopping list, cloud sync, "Start Baking" step-by-step mode, and more.
-See the full plan in [docs/roadmap.html](docs/roadmap.html).
+Most of the original roadmap is now shipped — favorites, tags, shopping list, unit
+conversion, media gallery, backup/restore, and "Start Baking" step-by-step mode.
+
+**Next up:** optional cloud sync and accounts (an in-progress version lives on the
+`feature/accounts-cloud` branch). See the full plan in [docs/roadmap.html](docs/roadmap.html).
 
 ---
 
