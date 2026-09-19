@@ -235,6 +235,14 @@ fun PastryDetailScreen(
                                     }
                                 )
                                 DropdownMenuItem(
+                                    text = { Text("Export as Excel") },
+                                    onClick = {
+                                        showMenu = false
+                                        Analytics.recipeExported("xlsx")
+                                        RecipeExporter.shareXlsx(context, pastry, scale, servings)
+                                    }
+                                )
+                                DropdownMenuItem(
                                     text = {
                                         Text(
                                             text = "Delete",

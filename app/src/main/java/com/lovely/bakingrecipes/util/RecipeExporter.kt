@@ -103,6 +103,22 @@ object RecipeExporter {
         shareFile(context, file, "text/csv", p.name)
     }
 
+    fun shareXlsx(
+        context: Context,
+        data: PastryWithIngredients,
+        scale: Double,
+        displayServings: Int
+    ) {
+        val bytes = RecipeXlsx.build(data, scale, displayServings)
+        val file = writeToCache(context, "${safeName(data.pastry.name)}.xlsx", bytes)
+        shareFile(
+            context,
+            file,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            data.pastry.name
+        )
+    }
+
     // Brand palette (matches the app theme).
     private const val CARAMEL = 0xFFC8956C.toInt()
     private const val CREAM = 0xFFF2DFC8.toInt()
