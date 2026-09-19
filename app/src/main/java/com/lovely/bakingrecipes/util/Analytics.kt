@@ -57,10 +57,6 @@ object Analytics {
         log("backup", Bundle().apply { putString("action", action) })
     }
 
-    fun authEvent(action: String) {
-        log("auth", Bundle().apply { putString("action", action) })
-    }
-
     private fun log(name: String, params: Bundle? = null) {
         firebaseAnalytics?.logEvent(name, params)
     }
