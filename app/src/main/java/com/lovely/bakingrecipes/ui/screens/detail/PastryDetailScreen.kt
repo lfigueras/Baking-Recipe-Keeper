@@ -231,7 +231,7 @@ fun PastryDetailScreen(
                                     onClick = {
                                         showMenu = false
                                         Analytics.recipeExported("csv")
-                                        RecipeExporter.shareCsv(context, pastry, scale)
+                                        RecipeExporter.shareCsv(context, pastry, scale, servings)
                                     }
                                 )
                                 DropdownMenuItem(

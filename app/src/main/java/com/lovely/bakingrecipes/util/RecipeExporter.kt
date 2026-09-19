@@ -57,17 +57,50 @@ object RecipeExporter {
         }.trim()
     }
 
-    fun shareCsv(context: Context, data: PastryWithIngredients, scale: Double) {
+    fun shareCsv(
+        context: Context,
+        data: PastryWithIngredients,
+        scale: Double,
+        displayServings: Int
+    ) {
+        val p = data.pastry
         val csv = buildString {
-            appendLine("Ingredient,Amount,Unit")
-            data.ingredients.forEach { ing ->
-                appendLine(
-                    "${escapeCsv(ing.name)},${formatAmount(ing.amount * scale)},${escapeCsv(ing.unit.label)}"
-                )
+            appendLine("Baking Recipe Keeper")
+            appendLine()
+            appendLine("Recipe,${escapeCsv(p.name)}")
+            if (p.category.isNotBlank()) appendLine("Category,${escapeCsv(p.category)}")
+            if (p.servings > 0) appendLine("Servings,$displayServings")
+            if (p.prepMinutes > 0) appendLine("Prep (min),${p.prepMinutes}")
+            if (p.cookMinutes > 0) appendLine("Bake (min),${p.cookMinutes}")
+            if (p.difficulty.isNotBlank()) appendLine("Difficulty,${escapeCsv(p.difficulty)}")
+            if (data.tags.isNotEmpty()) {
+                appendLine("Tags,${escapeCsv(data.tags.joinToString(", ") { it.name })}")
+            }
+
+            if (data.ingredients.isNotEmpty()) {
+                appendLine()
+                appendLine("Ingredients")
+                appendLine("Amount,Unit,Ingredient")
+                data.ingredients.forEach { ing ->
+                    appendLine(
+                        "${formatAmount(ing.amount * scale)},${escapeCsv(ing.unit.label)},${escapeCsv(ing.name)}"
+                    )
+                }
+            }
+
+            if (data.steps.isNotEmpty()) {
+                appendLine()
+                appendLine("Baking Procedure")
+                appendLine("Step,Instruction")
+                data.steps.sortedBy { it.position }.forEachIndexed { index, step ->
+                    appendLine("${index + 1},${escapeCsv(step.instruction)}")
+                }
             }
         }
-        val file = writeToCache(context, "${safeName(data.pastry.name)}.csv", csv.toByteArray())
-        shareFile(context, file, "text/csv", data.pastry.name)
+        // BOM so Excel opens UTF-8 (accents/symbols) correctly.
+        val bytes = "\uFEFF$csv".toByteArray(Charsets.UTF_8)
+        val file = writeToCache(context, "${safeName(p.name)}.csv", bytes)
+        shareFile(context, file, "text/csv", p.name)
     }
 
     // Brand palette (matches the app theme).
