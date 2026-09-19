@@ -1,7 +1,6 @@
 package com.lovely.bakingrecipes.util
 
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -12,12 +11,26 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
-import androidx.core.content.FileProvider
 import com.lovely.bakingrecipes.data.PastryWithIngredients
 import com.lovely.bakingrecipes.data.formatAmount
-import java.io.File
+import java.io.ByteArrayOutputStream
 
 object RecipeExporter {
+
+    // A generated export ready to be written to a user-chosen location.
+    data class ExportContent(val fileName: String, val mimeType: String, val bytes: ByteArray)
+
+    const val MIME_PDF = "application/pdf"
+    const val MIME_CSV = "text/csv"
+    const val MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+    // Writes previously built bytes to a document Uri from the system "Save" picker.
+    fun writeToUri(context: Context, uri: Uri, bytes: ByteArray): Boolean = try {
+        context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } != null
+    } catch (e: Exception) {
+        false
+    }
+
 
     fun buildPlainText(
         data: PastryWithIngredients,
@@ -57,12 +70,11 @@ object RecipeExporter {
         }.trim()
     }
 
-    fun shareCsv(
-        context: Context,
+    fun buildCsv(
         data: PastryWithIngredients,
         scale: Double,
         displayServings: Int
-    ) {
+    ): ExportContent {
         val p = data.pastry
         val csv = buildString {
             appendLine("Baking Recipe Keeper")
@@ -99,24 +111,16 @@ object RecipeExporter {
         }
         // BOM so Excel opens UTF-8 (accents/symbols) correctly.
         val bytes = "\uFEFF$csv".toByteArray(Charsets.UTF_8)
-        val file = writeToCache(context, "${safeName(p.name)}.csv", bytes)
-        shareFile(context, file, "text/csv", p.name)
+        return ExportContent("${safeName(p.name)}.csv", MIME_CSV, bytes)
     }
 
-    fun shareXlsx(
-        context: Context,
+    fun buildXlsx(
         data: PastryWithIngredients,
         scale: Double,
         displayServings: Int
-    ) {
+    ): ExportContent {
         val bytes = RecipeXlsx.build(data, scale, displayServings)
-        val file = writeToCache(context, "${safeName(data.pastry.name)}.xlsx", bytes)
-        shareFile(
-            context,
-            file,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            data.pastry.name
-        )
+        return ExportContent("${safeName(data.pastry.name)}.xlsx", MIME_XLSX, bytes)
     }
 
     // Brand palette (matches the app theme).
@@ -127,12 +131,12 @@ object RecipeExporter {
     private const val MOCHA = 0xFF9C7B5E.toInt()
     private const val WHITE = 0xFFFFFFFF.toInt()
 
-    fun sharePdf(
+    fun buildPdf(
         context: Context,
         data: PastryWithIngredients,
         scale: Double,
         displayServings: Int
-    ) {
+    ): ExportContent {
         val document = PdfDocument()
         val pageWidth = 595
         val pageHeight = 842
@@ -329,12 +333,14 @@ object RecipeExporter {
         drawFooter(canvas)
         document.finishPage(page)
 
-        val file = File(cacheDir(context), "${safeName(p.name)}.pdf")
-        file.outputStream().use { document.writeTo(it) }
+        val bytes = ByteArrayOutputStream().use { stream ->
+            document.writeTo(stream)
+            stream.toByteArray()
+        }
         document.close()
         photo?.recycle()
 
-        shareFile(context, file, "application/pdf", p.name)
+        return ExportContent("${safeName(p.name)}.pdf", MIME_PDF, bytes)
     }
 
     // Loads a downsampled bitmap suitable for the PDF header; null on any failure.
@@ -391,33 +397,6 @@ object RecipeExporter {
             t = t.dropLast(1)
         }
         return "$t…"
-    }
-
-    private fun writeToCache(context: Context, fileName: String, bytes: ByteArray): File {
-        val file = File(cacheDir(context), fileName)
-        file.writeBytes(bytes)
-        return file
-    }
-
-    private fun cacheDir(context: Context): File {
-        val dir = File(context.cacheDir, "exports")
-        if (!dir.exists()) dir.mkdirs()
-        return dir
-    }
-
-    private fun shareFile(context: Context, file: File, mimeType: String, subject: String) {
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file
-        )
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = mimeType
-            putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, subject)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        context.startActivity(Intent.createChooser(intent, "Share $subject"))
     }
 
     private fun escapeCsv(value: String): String =

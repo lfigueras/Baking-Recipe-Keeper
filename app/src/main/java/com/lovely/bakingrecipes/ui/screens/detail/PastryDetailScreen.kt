@@ -2,6 +2,8 @@ package com.lovely.bakingrecipes.ui.screens.detail
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -54,6 +56,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +71,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
 import com.lovely.bakingrecipes.data.MediaItem
 import com.lovely.bakingrecipes.data.MediaType
 import com.lovely.bakingrecipes.data.Pastry
@@ -107,6 +111,35 @@ fun PastryDetailScreen(
     var fullScreenVideo by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Holds the generated export until the user picks a save location.
+    var pendingExport by remember { mutableStateOf<RecipeExporter.ExportContent?>(null) }
+    val saveLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val export = pendingExport
+        pendingExport = null
+        val uri = result.data?.data
+        if (result.resultCode == android.app.Activity.RESULT_OK && uri != null && export != null) {
+            val ok = RecipeExporter.writeToUri(context, uri, export.bytes)
+            scope.launch {
+                snackbarHostState.showSnackbar(
+                    if (ok) "Saved ${export.fileName}" else "Couldn't save file"
+                )
+            }
+        }
+    }
+
+    fun saveExport(export: RecipeExporter.ExportContent) {
+        pendingExport = export
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = export.mimeType
+            putExtra(Intent.EXTRA_TITLE, export.fileName)
+        }
+        saveLauncher.launch(intent)
+    }
 
     val baseServings = pastry?.pastry?.servings ?: 0
     var servings by remember(pastry?.pastry?.id) { mutableIntStateOf(baseServings) }
@@ -223,7 +256,7 @@ fun PastryDetailScreen(
                                     onClick = {
                                         showMenu = false
                                         Analytics.recipeExported("pdf")
-                                        RecipeExporter.sharePdf(context, pastry, scale, servings)
+                                        saveExport(RecipeExporter.buildPdf(context, pastry, scale, servings))
                                     }
                                 )
                                 DropdownMenuItem(
@@ -231,7 +264,7 @@ fun PastryDetailScreen(
                                     onClick = {
                                         showMenu = false
                                         Analytics.recipeExported("csv")
-                                        RecipeExporter.shareCsv(context, pastry, scale, servings)
+                                        saveExport(RecipeExporter.buildCsv(pastry, scale, servings))
                                     }
                                 )
                                 DropdownMenuItem(
@@ -239,7 +272,7 @@ fun PastryDetailScreen(
                                     onClick = {
                                         showMenu = false
                                         Analytics.recipeExported("xlsx")
-                                        RecipeExporter.shareXlsx(context, pastry, scale, servings)
+                                        saveExport(RecipeExporter.buildXlsx(pastry, scale, servings))
                                     }
                                 )
                                 DropdownMenuItem(
