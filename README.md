@@ -102,7 +102,8 @@ Most of the original roadmap is now shipped — favorites, tags, shopping list, 
 conversion, media gallery, backup/restore, and "Start Baking" step-by-step mode.
 
 **Next up:** optional cloud sync and accounts (an in-progress version lives on the
-`feature/accounts-cloud` branch). See the full plan in [docs/roadmap.html](docs/roadmap.html).
+`feature/accounts-cloud` branch). See the full plan in [docs/roadmap.md](docs/roadmap.md)
+(or the printable [docs/roadmap.html](docs/roadmap.html)).
 
 ---
 
