@@ -2,11 +2,16 @@ package com.lovely.bakingrecipes.util
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
+import android.net.Uri
 import androidx.core.content.FileProvider
 import com.lovely.bakingrecipes.data.PastryWithIngredients
 import com.lovely.bakingrecipes.data.formatAmount
@@ -119,8 +124,14 @@ object RecipeExporter {
         }
         val bandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = CARAMEL }
         val bgPaint = Paint().apply { color = WARM }
+        val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true }
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE; color = WHITE; strokeWidth = 2f
+        }
 
         val p = data.pastry
+        val photo: Bitmap? = p.imageUri?.let { loadHeaderBitmap(context, it) }
+        val bandHeight = if (photo != null) 148f else headerHeight
 
         var pageNumber = 1
         var pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
@@ -138,13 +149,26 @@ object RecipeExporter {
         }
 
         drawBackground(canvas)
-        // Header band on the first page.
-        canvas.drawRect(0f, 0f, pageWidth.toFloat(), headerHeight, bandPaint)
-        canvas.drawText(p.name, margin, 52f, titlePaint)
-        if (p.category.isNotBlank()) {
-            canvas.drawText(p.category, margin, 76f, subtitlePaint)
+        // Header band on the first page (taller when a photo is present).
+        canvas.drawRect(0f, 0f, pageWidth.toFloat(), bandHeight, bandPaint)
+
+        var titleMaxWidth = contentWidth
+        if (photo != null) {
+            val thumbW = 158f
+            val thumbH = bandHeight - 28f
+            val left = pageWidth - margin - thumbW
+            val top = (bandHeight - thumbH) / 2f
+            drawRoundedBitmap(canvas, photo, RectF(left, top, left + thumbW, top + thumbH), 12f, imagePaint, borderPaint)
+            titleMaxWidth = left - margin - 14f
         }
-        y = headerHeight + 30f
+
+        val titleY = if (photo != null) bandHeight / 2f - 4f else 52f
+        val categoryY = if (photo != null) bandHeight / 2f + 20f else 76f
+        canvas.drawText(fitText(p.name, titlePaint, titleMaxWidth), margin, titleY, titlePaint)
+        if (p.category.isNotBlank()) {
+            canvas.drawText(fitText(p.category, subtitlePaint, titleMaxWidth), margin, categoryY, subtitlePaint)
+        }
+        y = bandHeight + 30f
 
         fun newPage() {
             drawFooter(canvas)
@@ -259,8 +283,65 @@ object RecipeExporter {
         val file = File(cacheDir(context), "${safeName(p.name)}.pdf")
         file.outputStream().use { document.writeTo(it) }
         document.close()
+        photo?.recycle()
 
         shareFile(context, file, "application/pdf", p.name)
+    }
+
+    // Loads a downsampled bitmap suitable for the PDF header; null on any failure.
+    private fun loadHeaderBitmap(context: Context, uriString: String): Bitmap? = try {
+        val uri = Uri.parse(uriString)
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, bounds)
+        }
+        val target = 500
+        var sample = 1
+        val maxDim = maxOf(bounds.outWidth, bounds.outHeight)
+        while (maxDim / (sample * 2) >= target) sample *= 2
+        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        context.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, opts)
+        }
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun drawRoundedBitmap(
+        canvas: Canvas,
+        bitmap: Bitmap,
+        dest: RectF,
+        radius: Float,
+        imagePaint: Paint,
+        borderPaint: Paint
+    ) {
+        canvas.save()
+        canvas.clipPath(Path().apply { addRoundRect(dest, radius, radius, Path.Direction.CW) })
+        val bw = bitmap.width.toFloat()
+        val bh = bitmap.height.toFloat()
+        val destRatio = dest.width() / dest.height()
+        val src = if (bw / bh > destRatio) {
+            val newW = bh * destRatio
+            val dx = (bw - newW) / 2f
+            Rect(dx.toInt(), 0, (dx + newW).toInt(), bh.toInt())
+        } else {
+            val newH = bw / destRatio
+            val dy = (bh - newH) / 2f
+            Rect(0, dy.toInt(), bw.toInt(), (dy + newH).toInt())
+        }
+        canvas.drawBitmap(bitmap, src, dest, imagePaint)
+        canvas.restore()
+        canvas.drawRoundRect(dest, radius, radius, borderPaint)
+    }
+
+    // Truncates with an ellipsis so single-line header text never overflows.
+    private fun fitText(text: String, paint: Paint, maxWidth: Float): String {
+        if (paint.measureText(text) <= maxWidth) return text
+        var t = text
+        while (t.isNotEmpty() && paint.measureText("$t…") > maxWidth) {
+            t = t.dropLast(1)
+        }
+        return "$t…"
     }
 
     private fun writeToCache(context: Context, fileName: String, bytes: ByteArray): File {
