@@ -103,7 +103,7 @@ conversion, media gallery, backup/restore, and "Start Baking" step-by-step mode.
 
 **Next up:** optional cloud sync and accounts (an in-progress version lives on the
 `feature/accounts-cloud` branch). See the full plan in [docs/roadmap.md](docs/roadmap.md)
-(or the printable [docs/roadmap.html](docs/roadmap.html)).
+(or the printable [PDF](docs/Baking-Recipe-Keeper-Roadmap.pdf) / [HTML](docs/roadmap.html)).
 
 ---
 
