@@ -64,17 +64,20 @@
 
   <h1>Baking Recipe Keeper</h1>
   <p class="sub">Software Design Document</p>
-  <p class="meta">Android application · Kotlin + Jetpack Compose · Version 1.0 · September 2026</p>
+  <p class="meta">Android application · Kotlin + Jetpack Compose · Version 1.1 · September 2026</p>
 
   <!-- 1 -->
   <div class="section">
     <h2>1. Overview</h2>
     <p>
       Baking Recipe Keeper is a native Android application for storing and managing baking recipes.
-      Each recipe holds descriptive metadata, a list of ingredients (with amounts and units), and an
-      ordered baking procedure. The app supports live serving-size scaling, search and filtering,
-      sharing, and light/dark theming. All data is stored locally on the device using a relational
-      database, and the interface is built entirely with a declarative UI toolkit.
+      Each recipe holds descriptive metadata, a list of ingredients (with amounts and units), an
+      ordered baking procedure, optional tags, and a media gallery of photos and a video. The app
+      supports live serving-size scaling, unit conversion, favorites, a consolidated shopping list,
+      a guided step-by-step “Start Baking” mode, exporting a recipe (PDF, Excel, CSV, or plain text),
+      full data backup/restore, search and filtering, and light/dark theming. All data is stored
+      locally on the device using a relational database, and the interface is built entirely with a
+      declarative UI toolkit. No account or network connection is required.
     </p>
   </div>
 
@@ -83,7 +86,13 @@
     <h2>2. Objectives &amp; Scope</h2>
     <ul>
       <li>Create, view, edit, and delete recipes with ingredients and step-by-step instructions.</li>
-      <li>Scale ingredient quantities automatically based on desired servings.</li>
+      <li>Scale ingredient quantities automatically based on desired servings, with unit conversion.</li>
+      <li>Mark favorites and organize recipes with custom tags.</li>
+      <li>Attach a gallery of photos and a procedure video to each recipe.</li>
+      <li>Build a consolidated, checkable shopping list from one or many recipes.</li>
+      <li>Guide the bake with a full-screen, screen-on, step-by-step mode.</li>
+      <li>Export a recipe as a styled PDF, Excel workbook, CSV, or plain text saved to the device.</li>
+      <li>Back up and restore all data as a single file.</li>
       <li>Provide a dashboard with counts, search, and category filtering.</li>
       <li>Aggregate ingredients across all recipes for an at-a-glance overview.</li>
       <li>Persist data reliably across app updates via database migrations.</li>
@@ -100,9 +109,12 @@
       <tr><td>UI</td><td>Jetpack Compose, Material 3</td></tr>
       <tr><td>Architecture</td><td>MVVM (Model–View–ViewModel)</td></tr>
       <tr><td>Persistence</td><td>Room (SQLite) with schema migrations</td></tr>
-      <tr><td>Navigation</td><td>Navigation Compose</td></tr>
+      <tr><td>Navigation</td><td>Navigation Compose (bottom navigation + routes)</td></tr>
       <tr><td>Async / state</td><td>Kotlin Coroutines &amp; Flow (<code>StateFlow</code>)</td></tr>
-      <tr><td>Images</td><td>Coil (Compose)</td></tr>
+      <tr><td>Images</td><td>Coil (Compose), with video-thumbnail support</td></tr>
+      <tr><td>Video</td><td>Media3 / ExoPlayer</td></tr>
+      <tr><td>Export</td><td>PDF via <code>android.graphics.pdf</code>; Excel via hand-written OOXML (no library); CSV / text</td></tr>
+      <tr><td>Analytics</td><td>Firebase Analytics</td></tr>
       <tr><td>Testing</td><td>JUnit (unit tests for core logic)</td></tr>
       <tr><td>Min / Target SDK</td><td>API 26 (Android 8.0) / API 36</td></tr>
     </table>
@@ -121,7 +133,7 @@
       <div class="arrow">▲ state (StateFlow) &nbsp;&nbsp; ▼ events</div>
       <div class="node">ViewModel Layer (MVVM)<small>HomeViewModel, AddPastryViewModel, PastryDetailViewModel, …</small></div>
       <div class="arrow">▼</div>
-      <div class="node">Repository<small>PastryRepository — single source of truth</small></div>
+      <div class="node">Repository<small>PastryRepository, ShoppingListRepository — single sources of truth</small></div>
       <div class="arrow">▼</div>
       <div class="node">Data Access Object (DAO)<small>PastryDao — Room queries</small></div>
       <div class="arrow">▼</div>
@@ -136,24 +148,35 @@
   <!-- 5 -->
   <div class="section pagebreak">
     <h2>5. Navigation Flow</h2>
-    <p>Screens are wired through a single <code>NavHost</code>. Routes and transitions:</p>
+    <p>Screens are wired through a single <code>NavHost</code>. A bottom navigation bar switches between four
+      top-level destinations: <strong>Home</strong>, <strong>Favorites</strong>, <strong>Categories</strong>, and <strong>More</strong>. Routes and transitions:</p>
     <div class="navgrid">
+      <div class="navrow"><span class="pill start">Home</span><span class="to">↔</span><span class="pill">Favorites</span><span class="to">↔</span><span class="pill">Categories</span><span class="to">↔</span><span class="pill">More</span></div>
       <div class="navrow"><span class="pill start">Home</span><span class="to">→</span><span class="pill">Add Recipe</span></div>
       <div class="navrow"><span class="pill start">Home</span><span class="to">→</span><span class="pill">Recipe Detail</span><span class="to">→</span><span class="pill">Edit Recipe</span></div>
-      <div class="navrow"><span class="pill start">Home</span><span class="to">→</span><span class="pill">Overview (all tiles)</span><span class="to">→</span><span class="pill">Category List / Ingredients</span><span class="to">→</span><span class="pill">Recipe Detail</span></div>
-      <div class="navrow"><span class="pill start">Home</span><span class="to">→</span><span class="pill">Ingredients Overview</span><span class="to">→</span><span class="pill">Recipe Detail</span></div>
-      <div class="navrow"><span class="pill start">Home</span><span class="to">→</span><span class="pill">Settings</span></div>
+      <div class="navrow"><span class="pill">Recipe Detail</span><span class="to">→</span><span class="pill">Start Baking</span></div>
+      <div class="navrow"><span class="pill">Recipe Detail</span><span class="to">→</span><span class="pill">Media Album</span></div>
+      <div class="navrow"><span class="pill">Recipe Detail</span><span class="to">→</span><span class="pill">Export (PDF / Excel / CSV)</span></div>
+      <div class="navrow"><span class="pill start">More</span><span class="to">→</span><span class="pill">Shopping List</span></div>
+      <div class="navrow"><span class="pill start">More</span><span class="to">→</span><span class="pill">Settings (Backup / Restore)</span></div>
+      <div class="navrow"><span class="pill start">Categories</span><span class="to">→</span><span class="pill">Category List / Ingredients</span><span class="to">→</span><span class="pill">Recipe Detail</span></div>
     </div>
     <table>
       <tr><th>Route</th><th>Screen</th><th>Purpose</th></tr>
       <tr><td class="k">home</td><td>HomeScreen</td><td>Dashboard, search, category filter, recipe list, add button.</td></tr>
+      <tr><td class="k">favorites</td><td>PastryListScreen</td><td>Recipes marked as favorites.</td></tr>
+      <tr><td class="k">categories</td><td>OverviewScreen</td><td>Browse dashboard tiles / categories.</td></tr>
+      <tr><td class="k">more</td><td>MoreScreen</td><td>Entry to Shopping List and Settings.</td></tr>
+      <tr><td class="k">shopping_list</td><td>ShoppingListScreen</td><td>Aggregated, checkable shopping list.</td></tr>
       <tr><td class="k">add_pastry</td><td>AddPastryScreen</td><td>Create a new recipe.</td></tr>
       <tr><td class="k">edit_pastry/{id}</td><td>AddPastryScreen</td><td>Edit an existing recipe (same screen in edit mode).</td></tr>
-      <tr><td class="k">detail/{id}</td><td>PastryDetailScreen</td><td>View a recipe, scale servings, share, edit, delete.</td></tr>
+      <tr><td class="k">detail/{id}</td><td>PastryDetailScreen</td><td>View a recipe; scale, favorite, share, export, edit, delete.</td></tr>
+      <tr><td class="k">start_baking/{id}</td><td>StartBakingScreen</td><td>Full-screen, screen-on, step-by-step baking mode.</td></tr>
+      <tr><td class="k">media/{id}</td><td>MediaAlbumScreen</td><td>Gallery of a recipe’s photos and video.</td></tr>
       <tr><td class="k">overview</td><td>OverviewScreen</td><td>Grid of all dashboard tiles.</td></tr>
       <tr><td class="k">ingredients</td><td>IngredientsListScreen</td><td>All ingredients grouped and searchable.</td></tr>
       <tr><td class="k">pastry_list/{category}</td><td>PastryListScreen</td><td>Recipes in a category (or all).</td></tr>
-      <tr><td class="k">settings</td><td>SettingsScreen</td><td>Theme selection and app info.</td></tr>
+      <tr><td class="k">settings</td><td>SettingsScreen</td><td>Theme, backup/restore, and app info.</td></tr>
     </table>
   </div>
 
@@ -180,6 +203,7 @@
       <tr><td class="k">servings</td><td>Int</td><td>Base yield; drives scaling (0 = unset).</td></tr>
       <tr><td class="k">prepMinutes / cookMinutes</td><td>Int</td><td>Prep and bake time in minutes.</td></tr>
       <tr><td class="k">difficulty</td><td>String</td><td>Easy / Medium / Hard (optional).</td></tr>
+      <tr><td class="k">isFavorite</td><td>Boolean</td><td>Whether the recipe is marked as a favorite.</td></tr>
       <tr><td class="k">createdAt / updatedAt</td><td>Long</td><td>Timestamps.</td></tr>
     </table>
 
@@ -207,19 +231,58 @@
       </div>
     </div>
     <p class="muted"><strong>IngredientUnit</strong> is an enum: Pieces, Grams, Kilograms, Ounces, Pounds, Milliliters, Liters, Teaspoons, Tablespoons, Cups, Pinch. Stored via a Room type converter.</p>
-    <p class="muted"><strong>PastryWithIngredients</strong> is a relation object that loads a recipe together with its ingredients and steps in one query.</p>
+    <p class="muted"><strong>PastryWithIngredients</strong> is a relation object that loads a recipe together with its ingredients, steps, tags, and media in one query.</p>
+
+    <h3>Tags &amp; media</h3>
+    <div class="cols">
+      <div>
+        <h3>Tag / PastryTagCrossRef</h3>
+        <table>
+          <tr><th>Field</th><th>Type</th></tr>
+          <tr><td class="k">Tag.id</td><td>Int (PK)</td></tr>
+          <tr><td class="k">Tag.name</td><td>String (unique)</td></tr>
+          <tr><td class="k">crossRef.pastryId</td><td>Int (FK)</td></tr>
+          <tr><td class="k">crossRef.tagId</td><td>Int (FK)</td></tr>
+        </table>
+      </div>
+      <div>
+        <h3>MediaItem</h3>
+        <table>
+          <tr><th>Field</th><th>Type</th></tr>
+          <tr><td class="k">id</td><td>Int (PK)</td></tr>
+          <tr><td class="k">pastryId</td><td>Int (FK)</td></tr>
+          <tr><td class="k">uri</td><td>String</td></tr>
+          <tr><td class="k">type</td><td>MediaType (Photo / Video)</td></tr>
+          <tr><td class="k">position</td><td>Int</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <h3>ShoppingListItem</h3>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Purpose</th></tr>
+      <tr><td class="k">id</td><td>Int (PK)</td><td>Auto-generated primary key.</td></tr>
+      <tr><td class="k">name</td><td>String</td><td>Ingredient name.</td></tr>
+      <tr><td class="k">amount</td><td>Double</td><td>Quantity.</td></tr>
+      <tr><td class="k">unit</td><td>String</td><td>Unit label.</td></tr>
+      <tr><td class="k">isChecked</td><td>Boolean</td><td>Checked-off state.</td></tr>
+      <tr><td class="k">sourcePastryId</td><td>Int?</td><td>Recipe the item came from (nullable for manual items).</td></tr>
+      <tr><td class="k">createdAt</td><td>Long</td><td>Timestamp.</td></tr>
+    </table>
   </div>
 
   <!-- 7 -->
   <div class="section">
     <h2>7. Database &amp; Migrations</h2>
-    <p><code>PastryDatabase</code> is the Room database (current version 5). Migrations preserve user data across updates:</p>
+    <p><code>PastryDatabase</code> is the Room database (current version 7). Migrations preserve user data across updates:</p>
     <table>
       <tr><th>Migration</th><th>Change</th></tr>
       <tr><td class="k">1 → 2</td><td>Added the <code>ingredients</code> table with a cascade foreign key.</td></tr>
       <tr><td class="k">2 → 3</td><td>Added <code>createdAt</code> / <code>updatedAt</code> to recipes.</td></tr>
       <tr><td class="k">3 → 4</td><td>Added the <code>steps</code> table.</td></tr>
       <tr><td class="k">4 → 5</td><td>Added servings, prep/bake minutes, and difficulty.</td></tr>
+      <tr><td class="k">5 → 6</td><td>Added <code>isFavorite</code>; added the <code>tags</code> + <code>pastry_tag</code> tables and the <code>shopping_list_items</code> table.</td></tr>
+      <tr><td class="k">6 → 7</td><td>Added the <code>media</code> table for multiple photos and a procedure video.</td></tr>
     </table>
   </div>
 
@@ -238,9 +301,10 @@
       <tr><td class="k">PastryDao</td><td class="k">getAllPastriesWithIngredients()</td><td>Reactive list of all recipes with children.</td></tr>
       <tr><td class="k">PastryDao</td><td class="k">getPastryWithIngredients(id)</td><td>Reactive single recipe with children.</td></tr>
       <tr><td class="k">PastryCategories</td><td class="k">all / singular()</td><td>Predefined categories; singular form for counts.</td></tr>
+      <tr><td class="k">ShoppingListDao</td><td class="k">observeItems() / insert() / update() / delete() / clear*()</td><td>Reactive shopping list with checkable items.</td></tr>
       <tr><td class="k">Ingredient.kt</td><td class="k">formatAmount()</td><td>Formats a Double amount without trailing “.0”.</td></tr>
       <tr><td class="k">ImageStorage</td><td class="k">deleteIfLocal()</td><td>Deletes a photo copied into app storage.</td></tr>
-      <tr><td class="k">Converters</td><td class="k">fromUnit()/toUnit()</td><td>Room type converter for the unit enum.</td></tr>
+      <tr><td class="k">Converters</td><td class="k">fromUnit()/toUnit(), fromMediaType()/toMediaType()</td><td>Room type converters for the unit and media-type enums.</td></tr>
     </table>
 
     <h3>8.2 Repository</h3>
@@ -251,7 +315,12 @@
       <tr><td class="k">insertPastryWithIngredients(...)</td><td>Save a new recipe plus its ingredients and steps.</td></tr>
       <tr><td class="k">updatePastryWithIngredients(...)</td><td>Update a recipe and replace its children.</td></tr>
       <tr><td class="k">deletePastry(pastry)</td><td>Remove a recipe.</td></tr>
+      <tr><td class="k">toggleFavorite(pastry)</td><td>Flip a recipe's favorite flag.</td></tr>
+      <tr><td class="k">duplicate(pastry)</td><td>Clone a recipe with its ingredients, steps, tags, and media.</td></tr>
+      <tr><td class="k">setTags(...) / media queries</td><td>Manage a recipe's tags and media gallery.</td></tr>
     </table>
+    <p class="muted"><strong>ShoppingListRepository</strong> exposes the list as a Flow and provides <code>addFromRecipe(recipe, scale)</code>,
+      <code>addAllRecipeIngredients()</code>, <code>addManual()</code>, <code>setChecked()</code>, <code>delete()</code>, <code>clearChecked()</code>, and <code>clearAll()</code>.</p>
 
     <h3>8.3 ViewModels</h3>
     <table>
@@ -261,7 +330,9 @@
       <tr><td class="k">PastryDetailViewModel</td><td>Exposes a single recipe as state; deletes it (and cleans up its image).</td></tr>
       <tr><td class="k">OverviewViewModel</td><td>Produces the full list of dashboard tiles.</td></tr>
       <tr><td class="k">IngredientsListViewModel</td><td>Groups ingredients across recipes; applies search.</td></tr>
-      <tr><td class="k">PastryListViewModel</td><td>Filters recipes by category (or all); sorts alphabetically.</td></tr>
+      <tr><td class="k">PastryListViewModel</td><td>Filters recipes by category, all, or favorites-only; sorts alphabetically.</td></tr>
+      <tr><td class="k">ShoppingListViewModel</td><td>Exposes the shopping list; toggles/checks, adds manual or recipe-sourced items, and clears.</td></tr>
+      <tr><td class="k">BackupViewModel</td><td>Exports and imports the full data backup to/from a user-chosen file.</td></tr>
       <tr><td class="k">buildDashboardTiles()</td><td>Pure function turning recipes into count tiles (Ingredients, All Recipes, per-category).</td></tr>
       <tr><td class="k">groupIngredients()</td><td>Pure function that merges ingredients by name and sums per unit.</td></tr>
     </table>
@@ -271,11 +342,25 @@
       <tr><th>Screen</th><th>Responsibility</th></tr>
       <tr><td class="k">HomeScreen</td><td>Dashboard tiles, search bar, category chips, recipe cards, add FAB, settings entry, snackbars.</td></tr>
       <tr><td class="k">AddPastryScreen</td><td>Form for name, category, details, photo, ingredients, and baking procedure; drag-to-reorder dialog; discard-changes guard.</td></tr>
-      <tr><td class="k">PastryDetailScreen</td><td>Displays a recipe; servings stepper scales amounts; share; full-screen photo; edit / delete.</td></tr>
+      <tr><td class="k">PastryDetailScreen</td><td>Displays a recipe; servings stepper scales amounts with unit conversion; favorite, share, export (PDF/Excel/CSV), start baking, media album; full-screen photo; edit / delete.</td></tr>
+      <tr><td class="k">StartBakingScreen</td><td>Full-screen, screen-on, step-by-step guided baking view.</td></tr>
+      <tr><td class="k">MediaAlbumScreen</td><td>Gallery of a recipe's photos and video (ExoPlayer playback).</td></tr>
+      <tr><td class="k">ShoppingListScreen</td><td>Checkable shopping list; add manual or from recipes; clear checked/all.</td></tr>
+      <tr><td class="k">MoreScreen</td><td>Entry points to Shopping List and Settings.</td></tr>
       <tr><td class="k">IngredientsListScreen</td><td>Grouped, searchable ingredient list; taps open the owning recipe.</td></tr>
-      <tr><td class="k">PastryListScreen</td><td>List of recipes for a category or all recipes.</td></tr>
+      <tr><td class="k">PastryListScreen</td><td>List of recipes for a category, all recipes, or favorites only.</td></tr>
       <tr><td class="k">OverviewScreen</td><td>Full grid of dashboard tiles.</td></tr>
-      <tr><td class="k">SettingsScreen</td><td>Theme (System/Light/Dark) and app version.</td></tr>
+      <tr><td class="k">SettingsScreen</td><td>Theme (System/Light/Dark), backup/restore, and app version.</td></tr>
+    </table>
+
+    <h3>8.5 Utilities</h3>
+    <table>
+      <tr><th>Class</th><th>Purpose</th></tr>
+      <tr><td class="k">RecipeExporter</td><td>Builds a styled PDF (with the recipe photo), CSV, and plain text; returns bytes and writes them to a user-chosen document Uri (Storage Access Framework — no permissions).</td></tr>
+      <tr><td class="k">RecipeXlsx</td><td>Generates a styled Excel <code>.xlsx</code> workbook by writing OOXML parts into a zip — no third-party library.</td></tr>
+      <tr><td class="k">UnitConverter</td><td>Converts ingredient amounts between compatible units for scaling and display.</td></tr>
+      <tr><td class="k">BackupManager</td><td>Serializes and restores all recipes and related data as a single JSON backup file.</td></tr>
+      <tr><td class="k">Analytics</td><td>Thin wrapper over Firebase Analytics for key events (export, share, shopping list, backup).</td></tr>
     </table>
   </div>
 
@@ -304,6 +389,18 @@
       <li>User confirms in a dialog (destructive action in red).</li>
       <li>The recipe and its image are removed; a snackbar confirms on the previous screen.</li>
     </ol>
+    <h3>Export a recipe</h3>
+    <ol>
+      <li>From the detail menu the user picks PDF, Excel, or CSV.</li>
+      <li>The exporter builds the file in memory (styled with the brand palette; the PDF embeds the recipe photo).</li>
+      <li>A system “Save” dialog opens; the user chooses the location and the bytes are written there.</li>
+      <li>A snackbar confirms the saved file name.</li>
+    </ol>
+    <h3>Build a shopping list</h3>
+    <ol>
+      <li>From a recipe the user adds its (scaled) ingredients to the shopping list, or adds items manually.</li>
+      <li>Duplicate ingredients aggregate; items can be checked off, and checked or all items cleared.</li>
+    </ol>
   </div>
 
   <!-- 10 -->
@@ -323,11 +420,11 @@
   <div class="section">
     <h2>11. Future Enhancements</h2>
     <ul>
-      <li>Favorites, duplicate recipe, and a shopping list.</li>
-      <li>Cloud sync and multi-device backup (accounts).</li>
-      <li>Guided “Start Baking” mode with per-step timers.</li>
-      <li>Unit conversion and recipe import from the web.</li>
-      <li>Subscription (freemium) with premium features.</li>
+      <li>User accounts with cloud sync and multi-device backup (in progress on a separate branch).</li>
+      <li>Recipe import from the web and photo/OCR → recipe.</li>
+      <li>Meal / bake planner with reminders.</li>
+      <li>AI assistant for substitutions, troubleshooting, and auto-scaling.</li>
+      <li>Community sharing and a subscription (freemium) tier with premium features.</li>
     </ul>
   </div>
 
