@@ -8,7 +8,7 @@ A warm, easy-to-use baking recipe app for Android — keep every recipe, ingredi
 
 ## 📲 Download & try it
 
-Grab the latest APK from the **[Releases page](https://github.com/lfigueras/Ingredient-Keeper/releases/latest)**.
+Grab the latest APK from the **[Releases page](https://github.com/lfigueras/Baking-Recipe-Keeper/releases/latest)**.
 
 1. Open the link on an **Android** phone (Android 8.0 / API 26+) and download the `.apk`.
 2. Open the file; if prompted, allow **install from unknown sources**.
@@ -63,8 +63,8 @@ Each screen renders immutable UI state exposed by a ViewModel; the ViewModel tal
 ## 🚀 Build from source
 
 ```bash
-git clone https://github.com/lfigueras/Ingredient-Keeper.git
-cd Ingredient-Keeper
+git clone https://github.com/lfigueras/Baking-Recipe-Keeper.git
+cd Baking-Recipe-Keeper
 ./gradlew assembleDebug
 # APK: app/build/outputs/apk/debug/app-debug.apk
 ```
@@ -89,8 +89,8 @@ _Screenshots coming soon._
 
 Found a bug or have an idea? I'd love to hear it!
 
-- 🐛 **Report a bug:** [open an issue](https://github.com/lfigueras/Ingredient-Keeper/issues/new/choose)
-- 💡 **Suggest a feature:** [open an issue](https://github.com/lfigueras/Ingredient-Keeper/issues/new/choose)
+- 🐛 **Report a bug:** [open an issue](https://github.com/lfigueras/Baking-Recipe-Keeper/issues/new/choose)
+- 💡 **Suggest a feature:** [open an issue](https://github.com/lfigueras/Baking-Recipe-Keeper/issues/new/choose)
 
 (A free GitHub account is needed to file an issue.)
 
